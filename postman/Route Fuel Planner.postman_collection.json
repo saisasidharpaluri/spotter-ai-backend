@@ -1,0 +1,73 @@
+{
+  "info": {
+    "_postman_id": "5dcaa23e-213e-4b9c-98cb-1c39b53e4586",
+    "name": "Route Fuel Planner API",
+    "description": "Demonstrates a US route and the recommended fuel stops. The Visualize tab draws the GeoJSON route with numbered stop markers.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Plan route and fuel stops",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"start_address\": \"Dallas, TX\",\n  \"finish_address\": \"Atlanta, GA\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/route-fuel-plan/",
+        "description": "Returns route GeoJSON, selected fuel stops, and the trip fuel-spend estimate."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Request completed successfully', function () { pm.response.to.have.status(200); });",
+              "const result = pm.response.json();",
+              "if (pm.response.code === 200 && result.route && result.route.geometry && result.route.geometry.coordinates) {",
+              "  const route = result.route.geometry.coordinates;",
+              "  const stops = result.fuel_stops || [];",
+              "  const allPoints = route.concat(stops.map(s => [s.coordinates.longitude, s.coordinates.latitude]));",
+              "  const meanLat = allPoints.reduce((sum, p) => sum + p[1], 0) / allPoints.length;",
+              "  const projected = allPoints.map(p => [p[0] * Math.cos(meanLat * Math.PI / 180), p[1]]);",
+              "  const xs = projected.map(p => p[0]), ys = projected.map(p => p[1]);",
+              "  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);",
+              "  const width = 960, height = 500, pad = 36;",
+              "  const sx = (width - 2 * pad) / Math.max(maxX - minX, 1e-8), sy = (height - 2 * pad) / Math.max(maxY - minY, 1e-8);",
+              "  const scale = Math.min(sx, sy);",
+              "  const drawWidth = (maxX - minX) * scale, drawHeight = (maxY - minY) * scale;",
+              "  const left = (width - drawWidth) / 2, top = (height - drawHeight) / 2;",
+              "  const xy = p => [left + (p[0] - minX) * scale, height - top - (p[1] - minY) * scale];",
+              "  const path = route.map((p, i) => { const q = xy([p[0] * Math.cos(meanLat * Math.PI / 180), p[1]]); return (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join(' ');",
+              "  const markers = stops.map((s, i) => { const q = xy([s.coordinates.longitude * Math.cos(meanLat * Math.PI / 180), s.coordinates.latitude]); return '<g><circle cx=\"' + q[0].toFixed(1) + '\" cy=\"' + q[1].toFixed(1) + '\" r=\"12\" fill=\"#e86b2f\" stroke=\"white\" stroke-width=\"3\"/><text x=\"' + q[0].toFixed(1) + '\" y=\"' + (q[1] + 4).toFixed(1) + '\" text-anchor=\"middle\" fill=\"white\" font-size=\"11\" font-weight=\"bold\">' + (i + 1) + '</text></g>'; }).join('');",
+              "  const svg = '<svg viewBox=\"0 0 ' + width + ' ' + height + '\" role=\"img\" aria-label=\"Route and recommended fuel stops\"><rect width=\"100%\" height=\"100%\" rx=\"14\" fill=\"#f3f6f8\"/><path d=\"' + path + '\" fill=\"none\" stroke=\"#246b8e\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>' + markers + '</svg>';",
+              "  pm.visualizer.set('<style>body{font:14px system-ui;color:#183344}svg{width:100%;height:auto}.legend{color:#526977}</style><h3>Driving route and recommended fuel stops</h3>{{{svg}}}<p class=\"legend\">Blue line: route · Numbered orange markers: fuel stops · Coordinates are approximate city/town centers.</p>', { svg: svg });",
+              "} else {",
+              "  pm.visualizer.set('<pre>{{body}}</pre>', { body: JSON.stringify(result, null, 2) });",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
