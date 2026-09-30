@@ -41,6 +41,12 @@ class FuelStation:
     longitude: float
 
 
+@dataclass(frozen=True, slots=True)
+class FuelData:
+    stations: tuple[FuelStation, ...]
+    stats: dict[str, int]
+
+
 def normalize_place(value: str) -> str:
     """Normalize names while reconciling common city-name abbreviations."""
     text = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii").casefold()
@@ -93,7 +99,7 @@ def get_city_coordinates() -> dict[tuple[str, str], tuple[float, float]]:
 
 
 @lru_cache(maxsize=1)
-def get_stations() -> tuple[FuelStation, ...]:
+def _load_fuel_data() -> FuelData:
     """Validate the supplied CSV, retain U.S. rows, and attach place points."""
     path = Path(settings.FUEL_DATA_PATH)
     coordinates = get_city_coordinates()
@@ -102,7 +108,7 @@ def get_stations() -> tuple[FuelStation, ...]:
     }
     stations: list[FuelStation] = []
     us_rows = 0
-    missing_coordinates: list[str] = []
+    unmatched_rows = 0
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as source:
             reader = csv.DictReader(source)
@@ -123,7 +129,7 @@ def get_stations() -> tuple[FuelStation, ...]:
                 city = (row.get("City") or "").strip()
                 point = coordinates.get((state, normalize_place(city)))
                 if point is None:
-                    missing_coordinates.append(f"{city}, {state}")
+                    unmatched_rows += 1
                     continue
                 stations.append(
                     FuelStation(
@@ -141,9 +147,15 @@ def get_stations() -> tuple[FuelStation, ...]:
         raise RuntimeError(f"Cannot read fuel price data at {path}: {exc}") from exc
     if not stations:
         raise RuntimeError("No U.S. fuel stations could be matched to Census coordinates.")
-    get_stations.stats = {
-        "us_rows": us_rows,
-        "matched_rows": len(stations),
-        "unmatched_rows": len(missing_coordinates),
-    }
-    return tuple(stations)
+    return FuelData(
+        stations=tuple(stations),
+        stats={"us_rows": us_rows, "matched_rows": len(stations), "unmatched_rows": unmatched_rows},
+    )
+
+
+def get_stations() -> tuple[FuelStation, ...]:
+    return _load_fuel_data().stations
+
+
+def get_fuel_data_stats() -> dict[str, int]:
+    return dict(_load_fuel_data().stats)
