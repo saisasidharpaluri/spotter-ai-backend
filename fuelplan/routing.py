@@ -100,7 +100,11 @@ class OpenRouteServiceClient:
             response = self.session.post(
                 f"{self.base_url}/openrouteservice/v2/directions/driving-car/geojson",
                 json={"coordinates": [[start.longitude, start.latitude], [finish.longitude, finish.latitude]]},
-                headers={**self._headers(), "Content-Type": "application/json"},
+                headers={
+                    **self._headers(),
+                    "Accept": "application/geo+json",
+                    "Content-Type": "application/json",
+                },
                 timeout=self.timeout,
             )
             if response.status_code in {400, 404, 422}:

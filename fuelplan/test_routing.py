@@ -69,6 +69,7 @@ class OpenRouteServiceClientTests(SimpleTestCase):
         self.assertAlmostEqual(route.distance_miles, 714.6, places=1)
         self.assertEqual(route.duration_seconds, 40000)
         self.assertEqual(session.calls[0][1], "https://api.heigit.org/openrouteservice/v2/directions/driving-car/geojson")
+        self.assertEqual(session.calls[0][2]["headers"]["Accept"], "application/geo+json")
 
     @override_settings(ORS_API_KEY="")
     def test_reports_missing_api_key_as_configuration_error(self):
