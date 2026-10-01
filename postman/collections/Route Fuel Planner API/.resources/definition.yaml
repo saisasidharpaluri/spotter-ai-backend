@@ -1,0 +1,4 @@
+$kind: collection
+description: Demonstrates a US route and the recommended fuel stops. The Visualize tab draws the GeoJSON route with numbered stop markers.
+variables:
+  baseUrl: http://127.0.0.1:8000
